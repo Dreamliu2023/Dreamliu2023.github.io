@@ -1,51 +1,627 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <title>Countdown</title>
-    <link rel="stylesheet" href="resources/css/index.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>动态明信片</title>
+<style>
+*,*::before,*::after{box-sizing:border-box}
+html,body{height:100%;margin:0;overflow:hidden;background:#000;overscroll-behavior:none}
+body{-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent;
+  user-select:none;-webkit-user-select:none;font-family:var(--font-cap)}
+
+:root{
+  --font-intro:"Kaiti SC","STKaiti","KaiTi","楷体",serif;
+  --font-msg:"Kaiti SC","STKaiti","KaiTi","楷体",cursive;
+  --font-cap:"PingFang SC",system-ui,sans-serif;
+  --font-addr:Georgia,"Times New Roman",serif;
+  --font-pm:Georgia,serif;
+}
+
+/* 背景 */
+.bg{position:fixed;inset:0;z-index:0;pointer-events:none;opacity:0;
+  filter:blur(9px);transform:scale(1.09);will-change:opacity}
+.bg img,.bg svg{display:block;width:100%;height:100%;object-fit:cover}
+.vig{position:fixed;inset:0;z-index:1;pointer-events:none;opacity:0;will-change:opacity;
+  background:radial-gradient(ellipse at 50% 46%,transparent 28%,rgba(4,3,12,.84) 100%)}
+
+/* 开场 */
+.intro{position:fixed;inset:0;z-index:4;pointer-events:none;will-change:transform,opacity;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:.9em;padding:0 8vw;text-align:center}
+.intro p{margin:0;font-family:var(--font-intro);font-size:clamp(19px,4.2vw,40px);line-height:1.7;
+  letter-spacing:.34em;text-indent:.34em;color:rgba(255,255,255,.93);
+  text-shadow:0 0 34px rgba(255,200,140,.35),0 2px 22px rgba(0,0,0,.65);
+  opacity:0;animation:lineIn 1.1s cubic-bezier(.2,.8,.3,1) forwards}
+.intro p:nth-child(2){animation-delay:.62s}
+.intro p:nth-child(3){animation-delay:.99s}
+@keyframes lineIn{to{opacity:1}}
+.cue{margin-top:3.4em;font-size:clamp(10px,1.45vw,12px);letter-spacing:.42em;text-indent:.42em;
+  color:rgba(255,255,255,.55);opacity:0;
+  animation:cueIn 1s ease 1.8s forwards,cueBreathe 2.6s ease-in-out 2.8s infinite}
+@keyframes cueIn{to{opacity:1}}
+@keyframes cueBreathe{0%,100%{opacity:.34;transform:translateY(0)}50%{opacity:.95;transform:translateY(5px)}}
+
+/* 舞台 */
+.stage{position:fixed;inset:0;z-index:2;display:flex;align-items:center;justify-content:center;
+  contain:strict;touch-action:none}
+.card-rise{perspective:1700px;perspective-origin:50% 50%;opacity:0;will-change:transform,opacity}
+.tilt{transform-style:preserve-3d;will-change:transform}
+.flip{position:relative;width:min(86vw,640px);aspect-ratio:640/410;
+  transform-style:preserve-3d;will-change:transform}
+
+/* 卡面 */
+.face{position:absolute;inset:0;border-radius:14px;overflow:hidden;
+  backface-visibility:hidden;-webkit-backface-visibility:hidden;container-type:inline-size;
+  box-shadow:0 30px 60px -20px rgba(0,0,0,.85),0 0 0 1px rgba(255,255,255,.09)}
+.front{background:#1c1140}
+.back{transform:rotateY(180deg);background:rgb(var(--back-bg,253,248,238));
+  color:rgb(var(--back-text,59,50,38))}
+.back::before{content:"";position:absolute;inset:0;pointer-events:none;
+  background-image:
+    repeating-linear-gradient(0deg,rgba(var(--back-line,110,92,66),.05) 0 1px,transparent 1px 3px),
+    repeating-linear-gradient(90deg,rgba(var(--back-line,110,92,66),.05) 0 1px,transparent 1px 3px)}
+
+.art{display:block;width:100%;height:100%;object-fit:cover}
+.shade{position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(to top,rgba(20,8,30,.62) 0%,transparent 40%)}
+.gloss{position:absolute;inset:0;pointer-events:none;mix-blend-mode:overlay;
+  background:radial-gradient(320px circle at var(--gx,50%) var(--gy,50%),
+    rgba(255,255,255,.30),rgba(255,255,255,0) 62%)}
+.caption{position:absolute;left:4.6cqw;bottom:4.6cqw;display:flex;align-items:center;gap:1.6cqw;
+  padding:1.4cqw 2.8cqw;border-radius:999px;background:rgba(22,10,32,.40);
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  border:1px solid rgba(255,255,255,.22);color:#fff;font-size:2.1cqw;letter-spacing:.08em;
+  text-shadow:0 1px 6px rgba(0,0,0,.55);white-space:nowrap}
+.caption i{width:1.3cqw;height:1.3cqw;border-radius:50%;background:#ffd98a;
+  box-shadow:0 0 10px 2px rgba(255,217,138,.85);flex-shrink:0}
+
+/* 背面只读文字 */
+.msg{position:absolute;left:6cqw;top:6.5cqw;bottom:6.5cqw;width:51cqw;padding:.4cqw .6cqw;
+  color:inherit;font-size:3cqw;line-height:1.95;font-family:var(--font-msg);
+  letter-spacing:.02em;white-space:pre-wrap;overflow:hidden;pointer-events:none}
+
+.divider{position:absolute;top:6.5cqw;bottom:6.5cqw;left:61cqw;width:1px;
+  background:linear-gradient(to bottom,transparent,
+    rgba(var(--back-line,110,92,66),.30) 12%,
+    rgba(var(--back-line,110,92,66),.30) 88%,transparent)}
+.right{position:absolute;left:65cqw;top:6.5cqw;bottom:6.5cqw;width:29cqw;
+  display:flex;flex-direction:column}
+
+.stamp-row{position:relative;height:14.5cqw}
+.stamp{position:absolute;right:0;top:0;width:11cqw;aspect-ratio:60/72;padding:1.3cqw;
+  background:#fff;border:1px dashed rgba(var(--back-line,110,92,66),.5);border-radius:2px;
+  box-shadow:0 3px 9px rgba(80,60,30,.16);overflow:hidden;
+  transition:transform .45s cubic-bezier(.34,1.56,.64,1)}
+.stamp:hover{transform:rotate(-4deg) scale(1.07)}
+.stamp img,.stamp svg{display:block;width:100%;height:100%;object-fit:cover}
+
+.postmark{position:absolute;left:-1.5cqw;top:-1.5cqw;width:15cqw;height:15cqw;opacity:.6;
+  transform:rotate(-14deg);pointer-events:none}
+.postmark circle,.postmark line{stroke:rgb(var(--back-line,110,92,66))}
+.postmark text{fill:rgb(var(--back-line,110,92,66))}
+
+.addr{margin-top:3.2cqw;display:flex;flex-direction:column;gap:1.8cqw}
+.addr-row{display:flex;align-items:flex-end;gap:1cqw;min-height:4.4cqw;padding-bottom:.6cqw;
+  border-bottom:1px solid rgba(var(--back-line,110,92,66),.30)}
+.addr-row.short{width:62%}
+.addr-label{flex-shrink:0;font-family:var(--font-addr);font-size:1.9cqw;line-height:1;
+  letter-spacing:.14em;color:rgba(var(--back-line,110,92,66),.75);padding-bottom:.2cqw}
+.addr-text{flex:1;min-width:0;font-family:var(--font-addr);font-size:2.1cqw;
+  line-height:1.25;color:inherit;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.addr-text i{font-style:normal;color:rgba(var(--back-line,110,92,66),.35)}
+
+/* 提示 & 进度 */
+.hint,.progress{position:fixed;left:50%;z-index:5;transform:translateX(-50%);pointer-events:none}
+.hint{bottom:4.5vh;padding:10px 24px;border-radius:999px;
+  border:1px solid rgba(255,255,255,.13);background:rgba(255,255,255,.05);
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  color:rgba(255,255,255,.62);font-size:13px;letter-spacing:.18em;white-space:nowrap;
+  opacity:0;transition:opacity .8s ease}
+.progress{bottom:11.5vh;width:min(50vw,260px);height:2px;border-radius:2px;
+  background:rgba(255,255,255,.12);overflow:hidden;opacity:0;transition:opacity .4s ease}
+.progress.show{opacity:1}
+.progress i{display:block;height:100%;width:0;border-radius:2px;
+  background:linear-gradient(90deg,#ffb45f,#ff7f6a)}
+
+@media (max-width:768px),(pointer:coarse){
+  .bg{filter:blur(5px);transform:scale(1.06)}
+  .card-rise{perspective:1150px}
+  .flip{width:min(90vw,560px)}
+  .hint{font-size:11px;letter-spacing:.1em;padding:8px 16px;bottom:5vh}
+  .progress{bottom:12vh}
+  .stamp:hover{transform:none}
+}
+</style>
 </head>
-
 <body>
-    <div class="background">
-        <div class="info">
-            <!--<div class="logo">
-                <p>M-I Studio</p>
-            </div>
-            <div class="button">
-                <a href="https://www.bilibili.com/" target="_blank"><img src="resources/images/bilibili.png" alt="bilibili.png"></a>
-            </div>-->
-            <img src="resources/images/background.jpg" alt="background.jpg">
-            <div class="left-box"></div>
-            <div class="right-box"></div>
-            <div class="time">
-                <h2 class="title">F I N A L &nbsp E X A M</h2>
-                <div class="time-box">
-                    <div class="days">
-                        <p class="day">00</p>
-                        <span class="text">Days</span>
-                    </div>
-                    <div class="hours">
-                        <p class="hour">00</p>
-                        <span class="text">Hours</span>
-                    </div>
-                    <div class="min">
-                        <p class="min">00</p>
-                        <span class="text">Min</span>
-                    </div>
-                    <div class="sec">
-                        <p class="sec">00</p>
-                        <span class="text">Sec</span>
-                    </div>
-                </div>
-                <p class="sub-title">The final exam will begin at the end of the countdown.</p>
-                <p class="sub-title tips"></p>
-            </div>
-        </div>
-    </div>
-</body>
 
-<script src="resources/js/jquery-3.2.1.min.js"></script>
-<script src="resources/js/index.js"></script>
+<div class="bg" id="bg">
+  <svg viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice">
+    <defs>
+      <linearGradient id="bSky" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#05060f"/><stop offset="26%" stop-color="#131a3c"/>
+        <stop offset="48%" stop-color="#3a2450"/><stop offset="64%" stop-color="#7e3f57"/>
+        <stop offset="76%" stop-color="#c06a4b"/><stop offset="86%" stop-color="#e79a55"/>
+        <stop offset="100%" stop-color="#f6c076"/>
+      </linearGradient>
+      <linearGradient id="bSea" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#e79a55"/><stop offset="6%" stop-color="#a85a55"/>
+        <stop offset="26%" stop-color="#5c2f52"/><stop offset="60%" stop-color="#2a1840"/>
+        <stop offset="100%" stop-color="#0d0a1e"/>
+      </linearGradient>
+      <radialGradient id="bMoon">
+        <stop offset="0%" stop-color="#fff6d8" stop-opacity=".95"/>
+        <stop offset="22%" stop-color="#ffd98a" stop-opacity=".55"/>
+        <stop offset="55%" stop-color="#ff9f5e" stop-opacity=".18"/>
+        <stop offset="100%" stop-color="#ff9f5e" stop-opacity="0"/>
+      </radialGradient>
+    </defs>
+    <rect width="1600" height="900" fill="url(#bSky)"/>
+    <g fill="#fff">
+      <circle cx="120" cy="78" r="2.2" opacity=".85"/><circle cx="392" cy="62" r="2.6" opacity=".9"/>
+      <circle cx="648" cy="96" r="2" opacity=".75"/><circle cx="900" cy="70" r="2.4" opacity=".85"/>
+      <circle cx="1360" cy="86" r="2.1" opacity=".8"/><circle cx="1540" cy="72" r="2.3" opacity=".8"/>
+      <circle cx="268" cy="146" r="1.5" opacity=".6"/><circle cx="780" cy="214" r="1.3" opacity=".45"/>
+      <circle cx="1010" cy="168" r="1.6" opacity=".55"/><circle cx="1470" cy="196" r="1.4" opacity=".5"/>
+      <circle cx="180" cy="252" r="1.2" opacity=".4"/><circle cx="470" cy="290" r="1.1" opacity=".35"/>
+      <circle cx="860" cy="300" r="1.2" opacity=".38"/><circle cx="1120" cy="60" r="1.8" opacity=".6"/>
+      <circle cx="1260" cy="240" r="1.3" opacity=".42"/><circle cx="520" cy="182" r="1.4" opacity=".5"/>
+    </g>
+    <circle cx="1180" cy="262" r="300" fill="url(#bMoon)"/>
+    <circle cx="1180" cy="262" r="54" fill="#fff8e0" opacity=".95"/>
+    <circle cx="1180" cy="262" r="54" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="1.6"/>
+    <g fill="#ffd0a0" opacity=".16">
+      <ellipse cx="330" cy="330" rx="230" ry="8"/><ellipse cx="980" cy="400" rx="300" ry="9"/>
+      <ellipse cx="1420" cy="336" rx="180" ry="7"/><ellipse cx="680" cy="452" rx="260" ry="8"/>
+    </g>
+    <path d="M0 640 L150 574 L280 618 L430 552 L600 626 L760 578 L920 636 L1080 566 L1240 630 L1400 580 L1600 640 L1600 672 L0 672 Z" fill="#1c1233" opacity=".92"/>
+    <rect y="640" width="1600" height="260" fill="url(#bSea)"/>
+    <g fill="#ffe9b0">
+      <ellipse cx="1180" cy="662" rx="78" ry="5" opacity=".45"/><ellipse cx="1180" cy="686" rx="64" ry="4.2" opacity=".38"/>
+      <ellipse cx="1180" cy="716" rx="50" ry="3.6" opacity=".3"/><ellipse cx="1180" cy="752" rx="38" ry="3" opacity=".24"/>
+      <ellipse cx="1180" cy="796" rx="26" ry="2.4" opacity=".18"/><ellipse cx="1180" cy="846" rx="16" ry="1.8" opacity=".12"/>
+    </g>
+    <g stroke="#ffd9a0" fill="none" stroke-linecap="round">
+      <path stroke-opacity=".13" stroke-width="1.6" d="M0 674 q40 -9 80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0"/>
+      <path stroke-opacity=".10" stroke-width="1.4" d="M0 726 q40 -10 80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0"/>
+      <path stroke-opacity=".08" stroke-width="1.2" d="M0 790 q40 -11 80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0"/>
+      <path stroke-opacity=".06" stroke-width="1" d="M0 856 q40 -12 80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0"/>
+    </g>
+  </svg>
+</div>
+<div class="vig" id="vig"></div>
+
+<div class="intro" id="intro">
+  <p></p><p></p><p></p>
+  <div class="cue"></div>
+</div>
+
+<div class="stage">
+  <div class="card-rise" id="rise">
+    <div class="tilt" id="tilt">
+      <div class="flip" id="flip">
+
+        <div class="face front" id="frontFace">
+          <svg class="art" id="frontArt" viewBox="0 0 640 410" preserveAspectRatio="xMidYMid slice">
+            <defs>
+              <linearGradient id="cSky" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#1c1140"/><stop offset="22%" stop-color="#40205e"/>
+                <stop offset="42%" stop-color="#8e3163"/><stop offset="56%" stop-color="#cf4d57"/>
+                <stop offset="67%" stop-color="#f0813f"/><stop offset="72%" stop-color="#ffb45f"/>
+              </linearGradient>
+              <linearGradient id="cSea" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#ffb45f"/><stop offset="8%" stop-color="#d1665a"/>
+                <stop offset="30%" stop-color="#7c3560"/><stop offset="62%" stop-color="#3a1c50"/>
+                <stop offset="100%" stop-color="#1a1038"/>
+              </linearGradient>
+              <radialGradient id="cGlow">
+                <stop offset="0%" stop-color="#fff3cf" stop-opacity=".95"/>
+                <stop offset="26%" stop-color="#ffc866" stop-opacity=".5"/>
+                <stop offset="60%" stop-color="#ff7f4a" stop-opacity=".16"/>
+                <stop offset="100%" stop-color="#ff7f4a" stop-opacity="0"/>
+              </radialGradient>
+            </defs>
+            <rect width="640" height="410" fill="url(#cSky)"/>
+            <g fill="#fff">
+              <circle cx="52" cy="36" r="1.5" opacity=".8"/><circle cx="224" cy="30" r="1.8" opacity=".85"/>
+              <circle cx="404" cy="26" r="1.5" opacity=".7"/><circle cx="574" cy="34" r="1.6" opacity=".8"/>
+              <circle cx="138" cy="66" r="1.1" opacity=".55"/><circle cx="312" cy="58" r="1.1" opacity=".5"/>
+              <circle cx="486" cy="62" r="1.1" opacity=".55"/><circle cx="86" cy="104" r="1.1" opacity=".45"/>
+              <circle cx="452" cy="100" r="1.2" opacity=".5"/><circle cx="188" cy="122" r="1" opacity=".4"/>
+              <circle cx="548" cy="118" r="1" opacity=".38"/>
+            </g>
+            <circle cx="330" cy="258" r="150" fill="url(#cGlow)"/>
+            <circle cx="330" cy="258" r="41" fill="#fff5d0"/>
+            <circle cx="330" cy="258" r="41" fill="none" stroke="#fffdf0" stroke-opacity=".65" stroke-width="1.4"/>
+            <g fill="#ffd4a8" opacity=".34">
+              <ellipse cx="132" cy="196" rx="92" ry="5"/><ellipse cx="486" cy="170" rx="112" ry="4"/>
+              <ellipse cx="318" cy="296" rx="132" ry="4.5"/><ellipse cx="86" cy="252" rx="72" ry="3.5"/>
+            </g>
+            <path d="M0 292 L74 262 L126 282 L190 246 L260 290 L332 270 L404 292 L466 264 L536 290 L640 258 L640 298 L0 298 Z" fill="#2b1240" opacity=".72"/>
+            <rect y="292" width="640" height="118" fill="url(#cSea)"/>
+            <g fill="#ffd98a">
+              <ellipse cx="330" cy="302" rx="50" ry="3.6" opacity=".62"/><ellipse cx="330" cy="316" rx="41" ry="3" opacity=".52"/>
+              <ellipse cx="330" cy="332" rx="32" ry="2.6" opacity=".42"/><ellipse cx="330" cy="350" rx="23" ry="2.2" opacity=".33"/>
+              <ellipse cx="330" cy="370" rx="15" ry="1.8" opacity=".24"/>
+            </g>
+            <g stroke="#ffd98a" fill="none" stroke-linecap="round">
+              <path stroke-opacity=".20" stroke-width="1.4" d="M-60 312 q30 -7 60 0 t60 0 t60 0 t60 0 t60 0 t60 0 t60 0 t60 0 t60 0 t60 0 t60 0 t60 0 t60 0"/>
+              <path stroke-opacity=".15" stroke-width="1.2" d="M-60 336 q30 -6 60 0 t60 0 t60 0 t60 0 t60 0 t60 0 t60 0 t60 0 t60 0 t60 0 t60 0 t60 0 t60 0"/>
+              <path stroke-opacity=".11" stroke-width="1.1" d="M-60 362 q30 -8 60 0 t60 0 t60 0 t60 0 t60 0 t60 0 t60 0 t60 0 t60 0 t60 0 t60 0 t60 0 t60 0"/>
+              <path stroke-opacity=".08" stroke-width="1" d="M-60 392 q30 -9 60 0 t60 0 t60 0 t60 0 t60 0 t60 0 t60 0 t60 0 t60 0 t60 0 t60 0 t60 0 t60 0"/>
+            </g>
+            <g fill="none" stroke="#2a1240" stroke-width="2" stroke-linecap="round" opacity=".8">
+              <path d="M120 138 q7 -8 14 0 q7 -8 14 0"/>
+              <path d="M232 108 q6 -7 12 0 q6 -7 12 0"/>
+              <path d="M190 168 q5 -6 10 0 q5 -6 10 0"/>
+            </g>
+          </svg>
+          <div class="shade"></div>
+          <div class="gloss"></div>
+          <div class="caption"><i></i><span id="frontCap"></span></div>
+        </div>
+
+        <div class="face back">
+          <div class="gloss"></div>
+          <div class="msg" id="msg"></div>
+          <div class="divider"></div>
+          <div class="right">
+            <div class="stamp-row">
+              <svg class="postmark" viewBox="0 0 120 120">
+                <g fill="none">
+                  <circle cx="60" cy="60" r="41" stroke-width="2.2" stroke-opacity=".75"/>
+                  <circle cx="60" cy="60" r="33" stroke-width="1" stroke-opacity=".5"/>
+                </g>
+                <text id="pm1" x="60" y="52" text-anchor="middle" font-size="12.5"
+                      font-family="Georgia,serif" letter-spacing="1.5" fill-opacity=".85">SEASIDE</text>
+                <text id="pm2" x="60" y="70" text-anchor="middle" font-size="10.5"
+                      font-family="Georgia,serif" letter-spacing="1" fill-opacity=".7">2026 · 09</text>
+                <line x1="28" y1="60" x2="92" y2="60" stroke-opacity=".35" stroke-width="1"/>
+              </svg>
+              <div class="stamp" id="stamp">
+                <svg viewBox="0 0 60 72">
+                  <defs>
+                    <linearGradient id="sSky" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stop-color="#ffd47e"/><stop offset="55%" stop-color="#ff9a3c"/>
+                      <stop offset="100%" stop-color="#e8556b"/>
+                    </linearGradient>
+                  </defs>
+                  <rect width="60" height="72" fill="url(#sSky)"/>
+                  <circle cx="30" cy="30" r="11" fill="#fff8d8" opacity=".95"/>
+                  <path d="M0 50 L14 38 L28 51 L43 40 L60 52 L60 72 L0 72 Z" fill="#5b2350" opacity=".9"/>
+                  <rect y="62" width="60" height="10" fill="#2d1040" opacity=".55"/>
+                </svg>
+              </div>
+            </div>
+            <div class="addr" id="addr"></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="progress" id="pbar"><i id="pbarI"></i></div>
+<div class="hint" id="hint"></div>
+
+<script src="config.js"></script>
+
+<script>
+if (!window.POSTCARD_CONFIG) {
+  window.POSTCARD_CONFIG = {
+    title:'动态明信片', fontFiles:[], fonts:{},
+    intro:{lines:['有 些 风 景','要 翻 过 山 越 过 海','才 能 遇 见'],
+      scrollCue:'向 下 滚 动 · S C R O L L'},
+    images:{background:'',front:'',stamp:''},
+    postmark:{line1:'SEASIDE',line2:'2026 · 09'},
+    front:{caption:'海边的黄昏 · By the Sea'},
+    back:{
+      color:{bg:'#fdf8ee',text:'#3b3226',line:'#6e5c42'},
+      message:['亲爱的你：','','海边的风很温柔，','夕阳把整片天空','都染成了橘色。','',
+        '希望有一天，','你也站在这里。','','—— 想念你的我'].join('\n'),
+      toLabel:'TO',
+      addressLines:[{text:'',ph:'收件人姓名'},{text:'',ph:'详细地址'},
+        {text:'',ph:'城市 / 邮编'},{text:'',ph:''}]
+    },
+    hint:'滚轮翻面 · 向上滚可回退 · 移动鼠标倾斜',
+    tuning:{}
+  };
+}
+</script>
+
+<script>
+(function(){
+'use strict';
+
+const CFG = Object.assign({
+  title:'', fontFiles:[], fonts:{}, intro:{lines:[]}, images:{}, postmark:{},
+  front:{}, back:{color:{}}, hint:'', tuning:{}
+}, window.POSTCARD_CONFIG || {});
+
+const T = Object.assign({
+  maxTilt:13, wheelSens:0.38, introSens:0.0013, flipMax:180, lerp:0.10,
+  backTrip:260, touchSens:0.9
+}, CFG.tuning);
+
+const $ = id => document.getElementById(id);
+const root = document.documentElement;
+const bgEl=$('bg'), vigEl=$('vig'), introEl=$('intro'),
+      riseEl=$('rise'), tiltEl=$('tilt'), flipEl=$('flip'),
+      hintEl=$('hint'), pbarWrap=$('pbar'), pbar=$('pbarI');
+
+const clamp = (v,a,b) => v<a?a:v>b?b:v;
+const smooth = (a,b,x) => { const t = clamp((x-a)/(b-a),0,1); return t*t*(3-2*t); };
+const esc = s => String(s).replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
+
+function hex2rgb(hex){
+  let h = String(hex).replace('#','').trim();
+  if (h.length===3) h = h.split('').map(c=>c+c).join('');
+  if (h.length!==6) return null;
+  const n = parseInt(h,16);
+  if (isNaN(n)) return null;
+  return ((n>>16)&255)+', '+((n>>8)&255)+', '+(n&255);
+}
+
+function setImage(container, url, className){
+  if (!url) return;
+  const img = new Image();
+  img.alt=''; img.decoding='async';
+  if (className) img.className = className;
+  img.onload = () => {
+    const apply = () => {
+      container.querySelectorAll('svg, img').forEach(n=>n.remove());
+      container.insertBefore(img, container.firstChild);
+    };
+    img.decode ? img.decode().then(apply, apply) : apply();
+  };
+  img.onerror = () => console.warn('[postcard] 图片加载失败:', url);
+  img.src = url;
+}
+
+/* 本地字体注入 */
+function injectFonts(list){
+  if (!list || !list.length) return;
+  const css = list.map(f => {
+    if (!f.family || !f.url) return '';
+    const fmt = f.format ? ` format("${f.format}")` : '';
+    return `@font-face{font-family:"${f.family}";src:url("${f.url}")${fmt};` +
+      `font-weight:${f.weight||'400'};font-style:${f.style||'normal'};` +
+      `font-display:${f.display||'swap'}}`;
+  }).filter(Boolean).join('\n');
+  if (!css) return;
+  const tag = document.createElement('style');
+  tag.textContent = css;
+  document.head.appendChild(tag);
+}
+
+/* ---------- 应用配置 ---------- */
+(function applyConfig(){
+  injectFonts(CFG.fontFiles);
+  if (CFG.title) document.title = CFG.title;
+
+  const f = CFG.fonts || {};
+  if (f.intro)    root.style.setProperty('--font-intro', f.intro);
+  if (f.message)  root.style.setProperty('--font-msg',   f.message);
+  if (f.caption)  root.style.setProperty('--font-cap',   f.caption);
+  if (f.address)  root.style.setProperty('--font-addr',  f.address);
+  if (f.postmark) root.style.setProperty('--font-pm',    f.postmark);
+
+  const lines = introEl.querySelectorAll('p');
+  (CFG.intro.lines || []).forEach((t,i)=>{ if (lines[i]) lines[i].textContent = t; });
+  const cue = introEl.querySelector('.cue');
+  if (cue) cue.textContent = CFG.intro.scrollCue || '';
+
+  const cap = $('frontCap');
+  if (cap) cap.textContent = (CFG.front||{}).caption || '';
+
+  const p1 = $('pm1'), p2 = $('pm2');
+  if (p1) p1.textContent = (CFG.postmark||{}).line1 || '';
+  if (p2) p2.textContent = (CFG.postmark||{}).line2 || '';
+
+  const msg = $('msg');
+  if (msg) msg.textContent = (CFG.back||{}).message || '';
+
+  const bc = (CFG.back||{}).color || {};
+  const bg = hex2rgb(bc.bg), txt = hex2rgb(bc.text), line = hex2rgb(bc.line);
+  if (bg)   root.style.setProperty('--back-bg',   bg);
+  if (txt)  root.style.setProperty('--back-text', txt);
+  if (line) root.style.setProperty('--back-line', line);
+
+  const addr = $('addr');
+  if (addr) {
+    const list = (CFG.back||{}).addressLines || [];
+    const last = list.length - 1;
+    const label = (CFG.back||{}).toLabel || 'TO';
+    addr.innerHTML = list.map((it,i)=>{
+      const cls = 'addr-row' + (i===last ? ' short' : '');
+      const lb  = i===0 ? `<span class="addr-label">${esc(label)}</span>` : '';
+      const v   = esc(it.text || '');
+      const ph  = esc(it.ph || '');
+      const inner = v || (ph ? `<i>${ph}</i>` : '');
+      return `<div class="${cls}">${lb}<span class="addr-text">${inner}</span></div>`;
+    }).join('');
+  }
+
+  if (hintEl) hintEl.textContent = CFG.hint || '';
+
+  const im = CFG.images || {};
+  setImage(bgEl, im.background, '');
+  setImage($('frontFace'), im.front, 'art');
+  setImage($('stamp'), im.stamp, '');
+})();
+
+/* ---------- 状态 ---------- */
+let introT=0, introC=0;
+let tTX=0, tTY=0, tCX=0, tCY=0;
+let angT=0, angC=0;
+let rafId=null, hintGone=false, hintTimer=null;
+let rectCache=null;
+let viewH=innerHeight, viewW=innerWidth;
+let backBuffer=0;
+
+/* ---------- 主循环 ---------- */
+function kick(){ if (rafId===null) rafId = requestAnimationFrame(frame); }
+
+function frame(){
+  rafId = null;
+
+  introC += (introT - introC) * T.lerp;
+  tCX    += (tTX    - tCX)    * T.lerp;
+  tCY    += (tTY    - tCY)    * T.lerp;
+  angC   += (angT   - angC)   * T.lerp;
+
+  const io = smooth(0, .4, introC);
+  introEl.style.opacity = (1 - io).toFixed(3);
+  introEl.style.transform = 'translate3d(0,' + (-io*140).toFixed(1) + 'px,0)';
+
+  bgEl.style.opacity  = smooth(.08,.58,introC).toFixed(3);
+  vigEl.style.opacity = smooth(.22,.72,introC).toFixed(3);
+
+  const rise = smooth(.22,1,introC);
+  riseEl.style.transform = 'translate3d(0,' + ((1-rise)*viewH*.62).toFixed(1) + 'px,0)';
+  riseEl.style.opacity   = smooth(.40,.88,introC).toFixed(3);
+
+  tiltEl.style.transform = 'rotateX(' + tCX.toFixed(2) + 'deg) rotateY(' + tCY.toFixed(2) + 'deg)';
+  flipEl.style.transform = 'rotateY(' + angC.toFixed(2) + 'deg)';
+
+  const pct = angC / T.flipMax * 100;
+  pbar.style.width = pct.toFixed(1) + '%';
+  pbarWrap.classList.toggle('show', introC>.96 && pct>1 && pct<99);
+
+  if (!hintGone) hintEl.style.opacity = smooth(.94,1,introC).toFixed(3);
+
+  if (Math.abs(introT-introC)>0.0005 ||
+      Math.abs(tTX-tCX)>0.008 ||
+      Math.abs(tTY-tCY)>0.008 ||
+      Math.abs(angT-angC)>0.008) {
+    kick();
+  } else {
+    introC=introT; tCX=tTX; tCY=tTY; angC=angT;
+  }
+}
+
+function dismissHint(){
+  if (hintGone) return;
+  hintGone = true;
+  hintEl.style.opacity = '0';
+}
+
+function pushIntro(v){
+  const prev = introT;
+  introT = clamp(v, 0, 1);
+  if (prev<1 && introT>=1 && !hintTimer && !hintGone) {
+    hintTimer = setTimeout(dismissHint, 9000);
+    rectCache = null;
+  }
+  kick();
+}
+
+/* ---------- 统一滚动处理（滚轮 & 触摸共用） ---------- */
+function handleScroll(d){
+  if (!d) return;
+
+  if (introT < 1) { pushIntro(introT + d*T.introSens); return; }
+
+  const prev = angT;
+  angT = clamp(angT + d*T.wheelSens, 0, T.flipMax);
+
+  if (Math.abs(angT - prev) > 0.01) {
+    dismissHint(); rectCache = null; backBuffer = 0;
+    kick(); return;
+  }
+
+  if (angT <= 0.01 && d < 0) {
+    backBuffer += -d;
+    if (backBuffer >= T.backTrip) {
+      backBuffer -= T.backTrip;
+      pushIntro(introT + d*T.introSens);
+    }
+  } else {
+    backBuffer = 0;
+  }
+  kick();
+}
+
+/* ---------- 滚轮 ---------- */
+addEventListener('wheel', e => {
+  e.preventDefault();
+  let d = e.deltaY;
+  if (e.deltaMode === 1) d *= 16;
+  else if (e.deltaMode === 2) d *= 100;
+  handleScroll(d);
+}, { passive:false });
+
+/* ---------- 触摸 ---------- */
+let touchLastY = 0, touchActive = false;
+addEventListener('touchstart', e => {
+  if (e.touches.length !== 1) { touchActive = false; return; }
+  touchActive = true;
+  touchLastY = e.touches[0].clientY;
+}, { passive:true });
+
+addEventListener('touchmove', e => {
+  if (!touchActive || e.touches.length !== 1) return;
+  const y = e.touches[0].clientY;
+  const dy = touchLastY - y;
+  touchLastY = y;
+  if (Math.abs(dy) < 0.5) return;
+  handleScroll(dy * T.touchSens);
+  if (e.cancelable) e.preventDefault();
+}, { passive:false });
+
+addEventListener('touchend',    () => { touchActive = false; }, { passive:true });
+addEventListener('touchcancel', () => { touchActive = false; }, { passive:true });
+
+/* ---------- 鼠标倾斜 + 高光 ---------- */
+let pPend = false, pX = 0, pY = 0;
+addEventListener('pointermove', e => {
+  if (e.pointerType === 'touch') return;
+  pX = e.clientX; pY = e.clientY;
+  if (pPend) return;
+  pPend = true;
+  requestAnimationFrame(() => {
+    pPend = false;
+    const nx = (pX/viewW - .5) * 2;
+    const ny = (pY/viewH - .5) * 2;
+    tTY =  clamp(nx,-1,1) * T.maxTilt;
+    tTX = -clamp(ny,-1,1) * T.maxTilt;
+
+    if (!rectCache) {
+      const r = flipEl.getBoundingClientRect();
+      if (r.width) rectCache = { l:r.left, t:r.top, w:r.width, h:r.height };
+    }
+    if (rectCache && rectCache.w) {
+      root.style.setProperty('--gx', ((pX-rectCache.l)/rectCache.w*100).toFixed(1) + '%');
+      root.style.setProperty('--gy', ((pY-rectCache.t)/rectCache.h*100).toFixed(1) + '%');
+    }
+    kick();
+  });
+}, { passive:true });
+
+addEventListener('pointerleave', () => { tTX = tTY = 0; kick(); });
+
+/* ---------- 空格键翻面 ---------- */
+addEventListener('keydown', e => {
+  if (e.code !== 'Space') return;
+  e.preventDefault();
+  if (introT < 1) return;
+  angT = angT >= T.flipMax/2 ? 0 : T.flipMax;
+  dismissHint(); rectCache = null; backBuffer = 0; kick();
+});
+
+/* ---------- 尺寸变化 ---------- */
+function onResize(){
+  viewH = innerHeight; viewW = innerWidth;
+  rectCache = null; tTX = tTY = 0;
+  kick();
+}
+addEventListener('resize', onResize);
+addEventListener('orientationchange', () => setTimeout(onResize, 200));
+
+kick();
+})();
+</script>
+</body>
 </html>
